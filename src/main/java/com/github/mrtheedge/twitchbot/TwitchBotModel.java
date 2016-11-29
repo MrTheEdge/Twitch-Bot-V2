@@ -1,7 +1,9 @@
 package com.github.mrtheedge.twitchbot;
 
+import com.github.mrtheedge.twitchbot.exceptions.NoSuchCommandException;
 import org.pircbotx.Configuration;
 import org.pircbotx.PircBotX;
+import org.pircbotx.User;
 import org.pircbotx.cap.EnableCapHandler;
 import org.pircbotx.exception.IrcException;
 import org.pircbotx.hooks.ListenerAdapter;
@@ -9,6 +11,7 @@ import org.pircbotx.hooks.events.*;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by E.J. Schroeder on 11/15/2016.
@@ -17,13 +20,16 @@ import java.util.Map;
  */
 public class TwitchBotModel extends ListenerAdapter {
 
-    private SpamFilter sf;
+    private SpamFilter spamFilter;
+    private UserDataManager userDataManager;
+    private CommandManager commandManager;
     private PircBotX bot;
-    private String channel;
-    private String username;
-    private String oauth;
+    private String channel = "YOUR_CHANNEL_NAME";
+    private String username = "BOT_NAME";
+    private String oauth = "OAUTH_TOKEN";
 
-    private Map<String, UserTimestamps> users;
+    private Map<String, UserChatInformation> users;
+    private Map<String, Command> commands;
 
     // https://tmi.twitch.tv/group/user/CHANNELNAME/chatters
     // Use this to get the initial list of viewers when we enter chat...
@@ -45,16 +51,33 @@ public class TwitchBotModel extends ListenerAdapter {
     }
 
     @Override
-    public void onJoin(JoinEvent event) throws Exception {
-
-    }
-
-    @Override
     public void onMessage(MessageEvent event) throws Exception {
-        sf.isSpam(event.getUser().getNick(), event.getMessage());
+        User user = event.getUser();
+        if (user == null) return;
 
         if (event.getMessage().equals("!disconnect")){
-            bot.send().quitServer();
+            // Only the broadcaster should be able to disconnect
+            if (user.getNick().equals(channel.substring(1))) {
+                bot.send().quitServer();
+                return;
+            }
+        }
+
+        userDataManager.newMessage(user.getNick()); // Add the latest messages timestamp for the user
+
+        String commandResponse = "";
+        if (event.getMessage().startsWith("!")){
+            String trimmedLine = event.getMessage().substring(1); // Trim off the '!'
+            try {
+                commandResponse = commandManager.parseCommand(trimmedLine, event.getTags());
+            } catch (NoSuchCommandException ex){
+                ex.printStackTrace();
+            }
+        }
+
+        if (commandResponse.equals("")){
+            // Either no command or the command was invalid. Prevents bypassing the spam filter with a '!'
+            SpamType type = spamFilter.isSpam(user.getNick(), event.getMessage());
         }
     }
 
@@ -64,31 +87,35 @@ public class TwitchBotModel extends ListenerAdapter {
     }
 
     @Override
-    public void onOp(OpEvent event) throws Exception {
+    public void onJoin(JoinEvent event) throws Exception {
+        User u = event.getUser();
+        if (u == null) return;
 
+        userDataManager.join(u.getNick());
     }
 
     @Override
     public void onPart(PartEvent event) throws Exception {
+        User u = event.getUser();
+        if (u == null) return;
 
+        userDataManager.part(u.getNick());
     }
 
     @Override
     public void onPrivateMessage(PrivateMessageEvent event) throws Exception {
-
+        // TODO Eventually add whisper support for the bot...
     }
 
     @Override
     public void onUnknown(UnknownEvent event) throws Exception {
-
+        //
     }
 
     public void connect() {
         try {
             bot.startBot();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (IrcException e) {
+        } catch (IOException | IrcException e) {
             e.printStackTrace();
         }
     }
@@ -102,18 +129,18 @@ public class TwitchBotModel extends ListenerAdapter {
                 .addCapHandler(new EnableCapHandler("twitch.tv/tags"))
                 .addCapHandler(new EnableCapHandler("twitch.tv/commands"))
                 .addServer("irc.twitch.tv")
-                .setName("BOT_NAME_HERE") //Your twitch.tv username
-                .setServerPassword("oauth:TOKEN_HERE") //Your oauth password from http://twitchapps.com/tmi
-                .addAutoJoinChannel("#CHANNEL_NAME_HERE") //Some twitch channel
+                .setName(username) //Your twitch.tv username
+                .setServerPassword(oauth) //Your oauth password from http://twitchapps.com/tmi
+                .addAutoJoinChannel(channel) //Some twitch channel
                 .addListener(this)
                 .buildConfiguration();
 
         bot = new PircBotX(config);
 
-        sf = new SpamFilter();
-        sf.registerCallback((u, t) -> {
-            bot.send().message("#CHANNEL_NAME_HERE", "/timeout " + u + " " + t);
-        });
+        spamFilter = new SpamFilter();
+        userDataManager = new UserDataManager();
+        commands = new ConcurrentHashMap<>();
+        spamFilter.registerCallback((u, t) -> bot.send().message(channel, "/timeout " + u + " " + t));
     }
 
     public static void main(String[] args){
