@@ -1,5 +1,10 @@
 package com.github.mrtheedge.twitchbot;
 
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.collections.ObservableSet;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -14,57 +19,58 @@ import java.util.regex.Pattern;
  */
 public class SpamFilter {
 
+
     private Map<String, Integer> userStrikes;   // Stores the number of strikes a user has from other offenses
     private Set<String> pardonedUsers;          // Stores the names of users that have a pass to post something that would be marked as spam.
     private Set<String> blacklist;
     private StrikeCallback strikeCallback;
 
-    private int allowedStrikes;                // The number of strikes before a user is timed out/banned
-    private double percentageCaps;              // Percentage of capital letters allowed in a message.
-    private int minimumWordLengthForCaps;
-    private int timeoutSeconds;
+    private SimpleIntegerProperty allowedStrikes;                 // The number of strikes before a user is timed out/banned
+    private SimpleDoubleProperty percentageCaps;              // Percentage of capital letters allowed in a message.
+    private SimpleIntegerProperty minimumWordLengthForCaps;
+    private SimpleIntegerProperty timeoutSeconds;
     private final Pattern LINK_REGEX = Pattern.compile("(https?://)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([/\\w \\.-]*)*/?");
 
-    private boolean checkForCaps;
-    private boolean checkForLinks;
-    private boolean checkBlacklist;
-    private boolean allowPardons;
-    private boolean timeoutOnStrikes;
+    private SimpleBooleanProperty checkForCaps;
+    private SimpleBooleanProperty checkForLinks;
+    private SimpleBooleanProperty checkBlacklist;
+    private SimpleBooleanProperty allowPardons;
+    private SimpleBooleanProperty timeoutOnStrikes;
 
     public SpamFilter(){
-        userStrikes = new HashMap<String, Integer>();
-        pardonedUsers = new HashSet<String>();
-        blacklist = new HashSet<String>();
+        userStrikes = new HashMap<>();
+        pardonedUsers = new HashSet<>();
+        blacklist = new HashSet<>();
 
-        allowedStrikes = 3;
-        percentageCaps = 0.75;
-        minimumWordLengthForCaps = 5;
-        timeoutSeconds = 15 * 60; // 15 minutes
+        allowedStrikes = new SimpleIntegerProperty(3);
+        percentageCaps = new SimpleDoubleProperty(0.75);
+        minimumWordLengthForCaps = new SimpleIntegerProperty(5);
+        timeoutSeconds = new SimpleIntegerProperty(15 * 60); // 15 minutes
 
-        checkForCaps = true;
-        checkForLinks = true;
-        checkBlacklist = true;
-        allowPardons = true;
-        timeoutOnStrikes = true;
+        checkForCaps = new SimpleBooleanProperty(true);
+        checkForLinks = new SimpleBooleanProperty(true);
+        checkBlacklist = new SimpleBooleanProperty(true);
+        allowPardons = new SimpleBooleanProperty(true);
+        timeoutOnStrikes = new SimpleBooleanProperty(true);
     }
 
     public SpamType isSpam(String nick, String message){
 
-        if (checkForCaps && messageExceedsCapsLimit(message)){
+        if (checkForCaps.getValue() && messageExceedsCapsLimit(message)){
             if (pardonedUsers.remove(nick)) // If the user has been pardoned, ignore the spam
                 return SpamType.NONE;
 
             addStrikeToUser(nick);
             return SpamType.CAPS;
         }
-        if (checkForLinks && messageContainsLink(message)){
+        if (checkForLinks.getValue() && messageContainsLink(message)){
             if (pardonedUsers.remove(nick)) // If the user has been pardoned, ignore the spam
                 return SpamType.NONE;
 
             addStrikeToUser(nick);
             return SpamType.LINK;
         }
-        if (checkBlacklist && messageContainsBlacklistedWord(message)){
+        if (checkBlacklist.getValue() && messageContainsBlacklistedWord(message)){
             if (pardonedUsers.remove(nick)) // If the user has been pardoned, ignore the spam
                 return SpamType.NONE;
 
@@ -76,7 +82,7 @@ public class SpamFilter {
     }
 
     public void pardonUser(String user){
-        if (allowPardons)
+        if (allowPardons.getValue())
             pardonedUsers.add(user);
     }
 
@@ -97,10 +103,10 @@ public class SpamFilter {
 
         strikes = strikes == null ? 1 : strikes + 1;
 
-        if (strikes >= allowedStrikes){
+        if (strikes >= allowedStrikes.getValue()){
             // Call strikeCallback to ban/time out user...
             userStrikes.remove(user);
-            if (strikeCallback != null && timeoutOnStrikes) strikeCallback.call(user, timeoutSeconds);
+            if (strikeCallback != null && timeoutOnStrikes.getValue()) strikeCallback.call(user, timeoutSeconds.getValue());
         } else {
             userStrikes.put(user, strikes); // Otherwise, update the users strike count to new value
         }
@@ -120,7 +126,7 @@ public class SpamFilter {
         int capsCount = 0;
         double percentage;
 
-        if ( msgLength > minimumWordLengthForCaps){
+        if ( msgLength > minimumWordLengthForCaps.getValue()){
 
             // Counting number of capital characters
             for (int i = 0; i < msgLength; i++) {
@@ -129,7 +135,7 @@ public class SpamFilter {
 
             percentage = ((double) capsCount) / msgLength; // Calculate caps percentage
 
-            if (percentage > percentageCaps)
+            if (percentage > percentageCaps.getValue())
                 return true;
         }
         return false;

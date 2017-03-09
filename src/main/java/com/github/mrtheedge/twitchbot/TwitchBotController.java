@@ -8,6 +8,8 @@ import org.pircbotx.cap.EnableCapHandler;
 import org.pircbotx.exception.IrcException;
 import org.pircbotx.hooks.ListenerAdapter;
 import org.pircbotx.hooks.events.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Map;
@@ -18,18 +20,17 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * The main model behind the application. Also functions as a listener for the actual IRC bot.
  */
-public class TwitchBotModel extends ListenerAdapter {
+public class TwitchBotController extends ListenerAdapter {
 
     private SpamFilter spamFilter;
     private UserDataManager userDataManager;
     private CommandManager commandManager;
     private PircBotX bot;
-    private String channel = "YOUR_CHANNEL_NAME";
-    private String username = "BOT_NAME";
-    private String oauth = "OAUTH_TOKEN";
+    private String channel = Secrets.CHANNEL_NAME;
+    private String username = Secrets.USER_NAME;
+    private String oauth = Secrets.OAUTH_TOKEN;
 
-    private Map<String, UserChatInformation> users;
-    private Map<String, Command> commands;
+    private Logger logger;
 
     // https://tmi.twitch.tv/group/user/CHANNELNAME/chatters
     // Use this to get the initial list of viewers when we enter chat...
@@ -37,7 +38,7 @@ public class TwitchBotModel extends ListenerAdapter {
 
     @Override
     public void onConnect(ConnectEvent event) throws Exception {
-
+        bot.send().message(channel, "/mods");
     }
 
     @Override
@@ -57,6 +58,7 @@ public class TwitchBotModel extends ListenerAdapter {
 
         if (event.getMessage().equals("!disconnect")){
             // Only the broadcaster should be able to disconnect
+            logger.info("Received !disconnect from chat. Disconnecting.");
             if (user.getNick().equals(channel.substring(1))) {
                 bot.send().quitServer();
                 return;
@@ -71,6 +73,7 @@ public class TwitchBotModel extends ListenerAdapter {
             try {
                 commandResponse = commandManager.parseCommand(trimmedLine, event.getTags());
             } catch (NoSuchCommandException ex){
+                logger.error("No Such Command: " + trimmedLine);
                 ex.printStackTrace();
             }
         }
@@ -120,7 +123,7 @@ public class TwitchBotModel extends ListenerAdapter {
         }
     }
 
-    public TwitchBotModel(){
+    public TwitchBotController(){
         Configuration config = new Configuration.Builder()
                 .setAutoNickChange(false) //Twitch doesn't support multiple users
                 .setOnJoinWhoEnabled(false) //Twitch doesn't support WHO command
@@ -130,21 +133,24 @@ public class TwitchBotModel extends ListenerAdapter {
                 .addCapHandler(new EnableCapHandler("twitch.tv/commands"))
                 .addServer("irc.twitch.tv")
                 .setName(username) //Your twitch.tv username
-                .setServerPassword(oauth) //Your oauth password from http://twitchapps.com/tmi
+                .setServerPassword(oauth) //Your generated oauth token
                 .addAutoJoinChannel(channel) //Some twitch channel
                 .addListener(this)
                 .buildConfiguration();
 
         bot = new PircBotX(config);
 
+        logger = LoggerFactory.getLogger(getClass());
+
         spamFilter = new SpamFilter();
         userDataManager = new UserDataManager();
-        commands = new ConcurrentHashMap<>();
+        commandManager = new CommandManager();
         spamFilter.registerCallback((u, t) -> bot.send().message(channel, "/timeout " + u + " " + t));
+
     }
 
     public static void main(String[] args){
-        TwitchBotModel tbm = new TwitchBotModel();
-        tbm.connect();
+        TwitchBotController tbc = new TwitchBotController();
+        tbc.connect();
     }
 }

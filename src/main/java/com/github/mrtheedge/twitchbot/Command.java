@@ -3,7 +3,6 @@ package com.github.mrtheedge.twitchbot;
 import com.github.mrtheedge.twitchbot.exceptions.CommandOnCooldownException;
 import com.github.mrtheedge.twitchbot.exceptions.InsufficientPermissionException;
 
-import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -34,7 +33,7 @@ public class Command {
         useCount = 0;
     }
 
-    public boolean isCallable(PermissionLevel level) {
+    public boolean isCallableBy(PermissionLevel level) {
         return level.ordinal() >= permissionLevel.ordinal();
     }
 
@@ -46,7 +45,7 @@ public class Command {
             throw new CommandOnCooldownException();
         }
 
-        if (!isCallable(level)){
+        if (!isCallableBy(level)){
             throw new InsufficientPermissionException();
         }
 
@@ -85,5 +84,5 @@ public class Command {
 }
 
 enum PermissionLevel {
-    All, Subscriber, Mod, Broadcaster
+    None, Subscriber, Mod, Broadcaster
 }

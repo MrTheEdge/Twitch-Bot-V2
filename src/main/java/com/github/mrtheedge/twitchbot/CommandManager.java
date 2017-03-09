@@ -55,7 +55,7 @@ public class CommandManager {
             Command command = commandMap.get(commandName);
             // Custom command was found
 
-            output = command.callCommand();
+            //output = command.callCommand();
         } else {
             // Look for built in command
 
@@ -72,6 +72,8 @@ public class CommandManager {
              */
 
             output = checkForBuiltIn(commandName, args);
+
+            // This is not done...
         }
 
         return "";
@@ -82,34 +84,61 @@ public class CommandManager {
         switch (commandName){
             case "addcom":
                 return parseAddcom(args);
-                break;
             case "editcom":
                 return parseEditcom(args);
-                break;
             case "delcom":
                 return parseDelcom(args);
-                break;
             case "raffle":
                 return parseRaffle(args);
-                break;
             case "auction":
                 return parseAuction(args);
-                break;
             case "blacklist":
                 return parseBlacklist(args);
-                break;
             case "poll":
                 return parsePoll(args);
-                break;
             case "vote":
                 return parseVote(args);
-                break;
             case "timers":
                 return parseTimers(args);
-                break;
             default:
                 return "";
         }
+    }
+
+    private String parseTimers(List<String> args) {
+        return null;
+    }
+
+    private String parseVote(List<String> args) {
+        return null;
+    }
+
+    private String parsePoll(List<String> args) {
+        return null;
+    }
+
+    private String parseBlacklist(List<String> args) {
+        return null;
+    }
+
+    private String parseAuction(List<String> args) {
+        return null;
+    }
+
+    private String parseRaffle(List<String> args) {
+        return null;
+    }
+
+    private String parseDelcom(List<String> args) {
+        return null;
+    }
+
+    private String parseEditcom(List<String> args) {
+        return null;
+    }
+
+    private String parseAddcom(List<String> args) {
+        return null;
     }
 
 }
